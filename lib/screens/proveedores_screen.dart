@@ -20,6 +20,8 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
   bool _isLoading = true;
   late TabController _tabController;
   int _refreshKey = 0;
+  int _paginaProveedores = 0;
+  static const int _tamanoProveedores = 5;
 
   @override
   void initState() {
@@ -39,6 +41,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
     final proveedores = await _dbHelper.getAllProveedores();
     setState(() {
       _proveedores = proveedores;
+      _paginaProveedores = 0;
       _isLoading = false;
     });
   }
@@ -89,7 +92,6 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
         appBar: AppBar(
           title: const Text(
             'Proveedores y Compras',
@@ -190,11 +192,21 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
       );
     }
 
-    return ListView.builder(
-      itemCount: _proveedores.length,
-      padding: const EdgeInsets.all(16),
-      itemBuilder: (context, index) {
-        final proveedor = _proveedores[index];
+    final totalPaginas = (_proveedores.length / _tamanoProveedores).ceil();
+    final inicio = _paginaProveedores * _tamanoProveedores;
+    final fin = (inicio + _tamanoProveedores) > _proveedores.length
+        ? _proveedores.length
+        : inicio + _tamanoProveedores;
+    final proveedoresPagina = _proveedores.sublist(inicio, fin);
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            itemCount: proveedoresPagina.length,
+            padding: const EdgeInsets.all(16),
+            itemBuilder: (context, index) {
+              final proveedor = proveedoresPagina[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           elevation: 2,
@@ -216,6 +228,13 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Center(
                 child: Text(
@@ -243,11 +262,11 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
                   if (proveedor.telefono != null)
                     Row(
                       children: [
-                        Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                        Icon(Icons.phone, size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
                         const SizedBox(width: 6),
                         Text(
                           proveedor.telefono!,
-                          style: TextStyle(color: Colors.grey[700]),
+                          style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
                         ),
                       ],
                     ),
@@ -256,12 +275,12 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
                       padding: const EdgeInsets.only(top: 4),
                       child: Row(
                         children: [
-                          Icon(Icons.email, size: 16, color: Colors.grey[600]),
+                          Icon(Icons.email, size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               proveedor.email!,
-                              style: TextStyle(color: Colors.grey[700]),
+                              style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -274,12 +293,12 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
                       child: Row(
                         children: [
                           Icon(Icons.location_on,
-                              size: 16, color: Colors.grey[600]),
+                              size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               proveedor.direccion!,
-                              style: TextStyle(color: Colors.grey[700]),
+                              style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -317,6 +336,34 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
           ),
         );
       },
+    ),
+        ),
+        if (_proveedores.length > _tamanoProveedores)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 88, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: _paginaProveedores > 0
+                      ? () => setState(() => _paginaProveedores--)
+                      : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text(
+                  'Página ${_paginaProveedores + 1} de $totalPaginas',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                IconButton(
+                  onPressed: _paginaProveedores < totalPaginas - 1
+                      ? () => setState(() => _paginaProveedores++)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -403,7 +450,6 @@ class _FormProveedorScreenState extends State<FormProveedorScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: Text(
           widget.proveedor == null ? 'Nuevo Proveedor' : 'Editar Proveedor',
@@ -460,13 +506,12 @@ class _FormProveedorScreenState extends State<FormProveedorScreen> {
                 hintText: 'Ej: Distribuidora XYZ',
                 prefixIcon: Icon(Icons.business, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -490,13 +535,12 @@ class _FormProveedorScreenState extends State<FormProveedorScreen> {
                 hintText: 'Ej: 5551234567',
                 prefixIcon: Icon(Icons.phone, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -515,13 +559,12 @@ class _FormProveedorScreenState extends State<FormProveedorScreen> {
                 hintText: 'Ej: contacto@proveedor.com',
                 prefixIcon: Icon(Icons.email, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -540,13 +583,12 @@ class _FormProveedorScreenState extends State<FormProveedorScreen> {
                 hintText: 'Ej: Av. Principal #123, Col. Centro',
                 prefixIcon: Icon(Icons.location_on, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -620,6 +662,8 @@ class _ComprasTabState extends State<ComprasTab> {
   final _dbHelper = DatabaseHelper.instance;
   List<CompraResumen> _compras = [];
   bool _isLoading = true;
+  int _paginaActual = 0;
+  static const int _tamanoPagina = 5;
 
   @override
   void initState() {
@@ -633,7 +677,41 @@ class _ComprasTabState extends State<ComprasTab> {
     setState(() {
       _compras = compras;
       _isLoading = false;
+      _paginaActual = 0;
     });
+  }
+
+  Future<void> _confirmarEliminarCompra(CompraResumen compra) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar compra'),
+        content: Text(
+          'Se eliminará esta compra y se revertirá el stock de ${compra.items.length} producto(s).\n\n¿Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar == true) {
+      await _dbHelper.deleteCompraGroup(compra.groupId);
+      await _cargarCompras();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Compra eliminada y stock revertido')),
+        );
+      }
+    }
   }
 
   @override
@@ -667,11 +745,19 @@ class _ComprasTabState extends State<ComprasTab> {
       );
     }
 
-    return ListView.builder(
-      itemCount: _compras.length,
+    final totalPaginas = (_compras.length / _tamanoPagina).ceil();
+    final inicio = _paginaActual * _tamanoPagina;
+    final fin = (inicio + _tamanoPagina) > _compras.length ? _compras.length : (inicio + _tamanoPagina);
+    final comprasPagina = _compras.sublist(inicio, fin);
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+      itemCount: comprasPagina.length,
       padding: const EdgeInsets.all(16),
       itemBuilder: (context, index) {
-        final compra = _compras[index];
+        final compra = comprasPagina[index];
         final tituloCompra = compra.items.length == 1
             ? compra.items.first.productoNombre
             : 'Compra (${compra.items.length} productos)';
@@ -685,6 +771,16 @@ class _ComprasTabState extends State<ComprasTab> {
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
               tilePadding: const EdgeInsets.all(16),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () => _confirmarEliminarCompra(compra),
+                  ),
+                  const Icon(Icons.expand_more),
+                ],
+              ),
               leading: Container(
                 width: 50,
                 height: 50,
@@ -730,7 +826,9 @@ class _ComprasTabState extends State<ComprasTab> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.green[50],
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : Colors.green[50],
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -749,7 +847,9 @@ class _ComprasTabState extends State<ComprasTab> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.surfaceContainerHighest
+                        : Colors.grey[50],
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(16),
                       bottomRight: Radius.circular(16),
@@ -808,9 +908,9 @@ class _ComprasTabState extends State<ComprasTab> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Theme.of(context).cardColor,
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[300]!),
+                                border: Border.all(color: Theme.of(context).dividerColor),
                               ),
                               child: Text(compra.notas!),
                             ),
@@ -825,6 +925,36 @@ class _ComprasTabState extends State<ComprasTab> {
           ),
         );
       },
+    ),
+        ),
+        if (totalPaginas > 1)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: _paginaActual > 0
+                      ? () => setState(() => _paginaActual -= 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_left),
+                  visualDensity: VisualDensity.compact,
+                ),
+                Text(
+                  'Página ${_paginaActual + 1} de $totalPaginas',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                IconButton(
+                  onPressed: (_paginaActual + 1) < totalPaginas
+                      ? () => setState(() => _paginaActual += 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -1039,7 +1169,6 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
     final formatoCurrency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text(
           'Registrar Compra',
@@ -1096,13 +1225,12 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
                 hintText: 'Seleccione un proveedor',
                 prefixIcon: Icon(Icons.business, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1136,13 +1264,12 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
                 hintText: 'Ej: Leche, Arroz, Atun',
                 prefixIcon: Icon(Icons.search, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1161,13 +1288,12 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
                 hintText: 'Seleccione un producto',
                 prefixIcon: Icon(Icons.inventory, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1195,13 +1321,12 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
                 hintText: 'Ej: 50',
                 prefixIcon: Icon(Icons.numbers, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1222,13 +1347,12 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
                 hintText: 'Ej: 15.50',
                 prefixIcon: Icon(Icons.attach_money, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1304,13 +1428,14 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Colors.green[50]!,
-                      Colors.green[100]!,
-                    ],
+                    colors: Theme.of(context).brightness == Brightness.dark
+                        ? [Colors.green.withValues(alpha: 0.2), Colors.green.withValues(alpha: 0.1)]
+                        : [Colors.green[50]!, Colors.green[100]!],
                   ),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green[300]!),
+                  border: Border.all(color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.green.withValues(alpha: 0.4)
+                      : Colors.green[300]!),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1349,13 +1474,12 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
                 hintText: 'Información adicional',
                 prefixIcon: Icon(Icons.note, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),

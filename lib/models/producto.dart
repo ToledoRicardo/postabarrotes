@@ -8,6 +8,9 @@ class Producto {
   final int? subcategoriaId; // Para subcategorías
   final bool esPrecioPorPeso; // true si el precio es por kg
   final bool esFrecuente; // true si es producto frecuente
+  final bool esStockPorPeso; // true si el stock se mide en gramos
+  final double? stockGramos; // stock en gramos (cuando esStockPorPeso = true)
+  final String? marca; // Marca del producto (opcional)
   final DateTime fechaCreacion;
 
   // Campos relacionales
@@ -24,6 +27,9 @@ class Producto {
     this.subcategoriaId,
     this.esPrecioPorPeso = false,
     this.esFrecuente = false,
+    this.esStockPorPeso = false,
+    this.stockGramos,
+    this.marca,
     DateTime? fechaCreacion,
     this.categoriaNombre,
     this.subcategoriaNombre,
@@ -40,6 +46,9 @@ class Producto {
       'subcategoria_id': subcategoriaId,
       'es_precio_por_peso': esPrecioPorPeso ? 1 : 0,
       'es_frecuente': esFrecuente ? 1 : 0,
+      'es_stock_por_peso': esStockPorPeso ? 1 : 0,
+      'stock_gramos': stockGramos,
+      'marca': marca,
       'fecha_creacion': fechaCreacion.toIso8601String(),
     };
   }
@@ -55,6 +64,9 @@ class Producto {
       subcategoriaId: map['subcategoria_id'],
       esPrecioPorPeso: map['es_precio_por_peso'] == 1,
       esFrecuente: map['es_frecuente'] == 1,
+      esStockPorPeso: map['es_stock_por_peso'] == 1,
+      stockGramos: map['stock_gramos'] != null ? (map['stock_gramos'] as num).toDouble() : null,
+      marca: map['marca'],
       fechaCreacion: DateTime.parse(map['fecha_creacion']),
       categoriaNombre: map['categoria_nombre'],
       subcategoriaNombre: map['subcategoria_nombre'],
@@ -71,6 +83,9 @@ class Producto {
     int? subcategoriaId,
     bool? esPrecioPorPeso,
     bool? esFrecuente,
+    bool? esStockPorPeso,
+    double? stockGramos,
+    String? marca,
     DateTime? fechaCreacion,
     String? categoriaNombre,
     String? subcategoriaNombre,
@@ -85,6 +100,9 @@ class Producto {
       subcategoriaId: subcategoriaId ?? this.subcategoriaId,
       esPrecioPorPeso: esPrecioPorPeso ?? this.esPrecioPorPeso,
       esFrecuente: esFrecuente ?? this.esFrecuente,
+      esStockPorPeso: esStockPorPeso ?? this.esStockPorPeso,
+      stockGramos: stockGramos ?? this.stockGramos,
+      marca: marca ?? this.marca,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       categoriaNombre: categoriaNombre ?? this.categoriaNombre,
       subcategoriaNombre: subcategoriaNombre ?? this.subcategoriaNombre,

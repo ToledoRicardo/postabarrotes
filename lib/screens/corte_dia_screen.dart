@@ -27,6 +27,7 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
   double _totalVentas = 0;
   double _totalIngresos = 0;
   double _totalEgresos = 0;
+  double _totalDevoluciones = 0;
   double _montoEsperado = 0;
   CorteDia? _corteExistente;
   UserProfileService? _profileService;
@@ -54,12 +55,14 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
     final ventas = await _dbHelper.getTotalVentasDia(_fecha);
     final ingresos = await _dbHelper.getTotalIngresosDia(_fecha);
     final egresos = await _dbHelper.getTotalEgresosDia(_fecha);
+    final devoluciones = await _dbHelper.getTotalDevolucionesDia(_fecha);
     final corte = await _dbHelper.getCortePorFecha(_fecha);
     
     setState(() {
       _totalVentas = ventas;
       _totalIngresos = ingresos;
       _totalEgresos = egresos;
+      _totalDevoluciones = devoluciones;
       _corteExistente = corte;
       _isLoading = false;
       
@@ -204,12 +207,9 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
     final analisisTecnico = _getAnalisisTecnico();
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Corte del Día',
             style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
         elevation: 0,
         actions: [
           if (_corteExistente != null)
@@ -290,7 +290,7 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).cardColor,
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
@@ -320,7 +320,6 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey[50],
                                   ),
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   inputFormatters: [
@@ -337,7 +336,6 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey[50],
                                   ),
                                   maxLines: 3,
                                   onChanged: (value) => setState(() {}),
@@ -573,6 +571,10 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
                       _buildResumenRow('Ingresos', _totalIngresos, Colors.blue),
                       const SizedBox(height: 12),
                       _buildResumenRow('Egresos', _totalEgresos, Colors.red),
+                      if (_totalDevoluciones > 0) ...[
+                        const SizedBox(height: 12),
+                        _buildResumenRow('Devoluciones', _totalDevoluciones, Colors.orange),
+                      ],
                     ],
                   ),
                 ),
@@ -734,15 +736,27 @@ class CortesSemanaScreen extends StatefulWidget {
 
 class _CortesSemanaScreenState extends State<CortesSemanaScreen> {
   final _dbHelper = DatabaseHelper.instance;
+  final ScreenshotController _screenshotController = ScreenshotController();
   List<CorteDia> _cortes = [];
   bool _isLoading = true;
   int _paginaActual = 0;
   static const int _tamanoPagina = 7;
+  String? _businessName;
+  String? _userName;
 
   @override
   void initState() {
     super.initState();
     _cargarCortes();
+    _cargarPerfil();
+  }
+
+  Future<void> _cargarPerfil() async {
+    final profileService = await UserProfileService.getInstance();
+    setState(() {
+      _userName = profileService.getUserName();
+      _businessName = profileService.getBusinessName();
+    });
   }
 
   Future<void> _cargarCortes() async {
@@ -800,6 +814,167 @@ class _CortesSemanaScreenState extends State<CortesSemanaScreen> {
     }
   }
 
+  Future<void> _descargarCorte(CorteDia corte) async {
+    try {
+      final formatoCurrency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+      final diferencia = corte.montoReal - corte.montoEsperado;
+
+      final image = await _screenshotController.captureFromWidget(
+        _buildCorteImagenAnterior(corte, formatoCurrency, diferencia),
+        pixelRatio: 2.0,
+      );
+
+      final nombre = 'corte_${DateFormat('yyyyMMdd').format(corte.fecha)}';
+      final result = await ImageSaverService.saveImage(
+        image,
+        quality: 100,
+        name: nombre,
+      );
+      final success = result['isSuccess'] == true || result['isSuccess'] == 1;
+      if (!success) {
+        throw Exception('No se pudo guardar la imagen');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Corte del ${DateFormat('dd/MM/yyyy').format(corte.fecha)} guardado en galería'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al descargar: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Widget _buildCorteImagenAnterior(CorteDia corte, NumberFormat fmt, double diferencia) {
+    return MediaQuery(
+      data: const MediaQueryData(),
+      child: Material(
+        color: Colors.white,
+        child: Container(
+          width: 400,
+          color: Colors.white,
+          padding: const EdgeInsets.all(20),
+          child: DefaultTextStyle(
+            style: const TextStyle(color: Colors.black87, fontFamily: 'Roboto', fontSize: 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.deepPurple, Colors.deepPurple[300]!],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        _businessName ?? 'Tienda de Abarrotes',
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text('CORTE DE CAJA', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, letterSpacing: 2)),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
+                        child: Text(DateFormat('dd/MM/yyyy').format(corte.fecha), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                      ),
+                      if (_userName != null) ...[
+                        const SizedBox(height: 8),
+                        Text('Encargado: $_userName', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[300]!)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Resumen', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      const SizedBox(height: 12),
+                      _buildFilaResumenImg('Ventas', corte.totalVentas, Colors.green, fmt),
+                      const SizedBox(height: 8),
+                      _buildFilaResumenImg('Ingresos', corte.totalIngresos, Colors.blue, fmt),
+                      const SizedBox(height: 8),
+                      _buildFilaResumenImg('Egresos', corte.totalEgresos, Colors.red, fmt),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[300]!)),
+                  child: Column(
+                    children: [
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        const Text('Esperado', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text(fmt.format(corte.montoEsperado), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ]),
+                      const SizedBox(height: 8),
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        const Text('En caja', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text(fmt.format(corte.montoReal), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ]),
+                      const Divider(height: 20),
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text(diferencia >= 0 ? 'Sobrante' : 'Faltante', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(fmt.format(diferencia.abs()), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: diferencia >= 0 ? Colors.green : Colors.red)),
+                      ]),
+                    ],
+                  ),
+                ),
+                if (corte.notas != null && corte.notas!.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(12)),
+                    child: Row(
+                      children: [
+                        Icon(Icons.note, color: Colors.blue[700], size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(corte.notas!, style: TextStyle(fontSize: 13, color: Colors.blue[800]))),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Center(child: Text('Generado: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}', style: TextStyle(fontSize: 11, color: Colors.grey[600]))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilaResumenImg(String label, double monto, Color color, NumberFormat fmt) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+        ]),
+        Text(fmt.format(monto), style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final formatoCurrency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
@@ -809,11 +984,8 @@ class _CortesSemanaScreenState extends State<CortesSemanaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cortes de la Semana', style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
         elevation: 0,
       ),
-      backgroundColor: Colors.grey[50],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -852,9 +1024,19 @@ class _CortesSemanaScreenState extends State<CortesSemanaScreen> {
                                     Text('Egresos: ${formatoCurrency.format(corte.totalEgresos)}'),
                                   ],
                                 ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                  onPressed: () => _eliminarCorte(corte),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.download, color: Colors.deepPurple),
+                                      tooltip: 'Descargar imagen',
+                                      onPressed: () => _descargarCorte(corte),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                      onPressed: () => _eliminarCorte(corte),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

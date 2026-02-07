@@ -399,16 +399,17 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
   Widget build(BuildContext context) {
     final formatoCurrency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
     final isTablet = MediaQuery.of(context).size.width > 600;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 // Header con búsqueda y filtros
                 Container(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   padding: const EdgeInsets.fromLTRB(20, 50, 20, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,7 +426,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
                           hintText: 'Buscar producto...',
                           prefixIcon: const Icon(Icons.search),
                           filled: true,
-                          fillColor: Colors.grey[100],
+                          fillColor: isDark ? const Color(0xFF2C2C3E) : Colors.grey[100],
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
@@ -463,7 +464,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
                             Container(
                               width: 350,
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Theme.of(context).cardColor,
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withValues(alpha: 0.05),
@@ -528,26 +529,41 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
                 ),
               ),
               if (totalPaginas > 1)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(12, 0, isTablet ? 12 : 80, 12),
+                Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         onPressed: _paginaProductos > 0
                             ? () => setState(() => _paginaProductos -= 1)
                             : null,
                         icon: const Icon(Icons.chevron_left),
+                        visualDensity: VisualDensity.compact,
                       ),
                       Text(
-                        'Pagina ${_paginaProductos + 1} de $totalPaginas',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        '${_paginaProductos + 1} / $totalPaginas',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       ),
                       IconButton(
                         onPressed: (_paginaProductos + 1) < totalPaginas
                             ? () => setState(() => _paginaProductos += 1)
                             : null,
                         icon: const Icon(Icons.chevron_right),
+                        visualDensity: VisualDensity.compact,
                       ),
                     ],
                   ),
@@ -565,8 +581,8 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
         builder: (context, setModalState) {
           return Container(
             height: MediaQuery.of(context).size.height * 0.85,
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Column(
@@ -614,9 +630,36 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
               if (_carrito.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '${_carrito.length} ${_carrito.length == 1 ? 'artículo' : 'artículos'}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${_carrito.length} ${_carrito.length == 1 ? 'artículo' : 'artículos'}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _carrito.clear());
+                          setModalState?.call(() {});
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.delete_sweep, color: Colors.white, size: 14),
+                              SizedBox(width: 4),
+                              Text('Limpiar', style: TextStyle(color: Colors.white, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -636,77 +679,108 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   itemCount: _carrito.length,
                   itemBuilder: (context, index) {
                     final detalle = _carrito[index];
-                    return Card(
+                    return Container(
                       margin: const EdgeInsets.only(bottom: 6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    detalle.productoNombre,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey[800]
+                            : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey[700]!
+                              : Colors.grey[200]!,
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // Cantidad con controles compactos
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.grey[700]
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 18),
-                                  onPressed: () {
-                                    _eliminarDelCarrito(index);
+                              ],
+                            ),
+                            height: 32,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    _cambiarCantidad(index, detalle.cantidad - 1);
                                     setModalState?.call(() {});
                                   },
-                                  color: Colors.red[400],
+                                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: Icon(Icons.remove, size: 14, color: Colors.red[400]),
+                                  ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
                                 Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove, size: 14),
-                                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                                        onPressed: () {
-                                          _cambiarCantidad(index, detalle.cantidad - 1);
-                                          setModalState?.call(() {});
-                                        },
-                                      ),
-                                      Text(
-                                        '${detalle.cantidad}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.add, size: 14),
-                                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                                        onPressed: () {
-                                          _cambiarCantidad(index, detalle.cantidad + 1);
-                                          setModalState?.call(() {});
-                                        },
-                                      ),
-                                    ],
+                                  constraints: const BoxConstraints(minWidth: 24),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '${detalle.cantidad}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                   ),
                                 ),
-                                const Spacer(),
-                                Text(
-                                  formatoCurrency.format(detalle.subtotal),
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green[700]),
+                                InkWell(
+                                  onTap: () {
+                                    _cambiarCantidad(index, detalle.cantidad + 1);
+                                    setModalState?.call(() {});
+                                  },
+                                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: Icon(Icons.add, size: 14, color: Colors.green[600]),
+                                  ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Nombre del producto
+                          Expanded(
+                            child: Text(
+                              detalle.productoNombre,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Precio
+                          Text(
+                            formatoCurrency.format(detalle.subtotal),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green[700]),
+                          ),
+                          // Eliminar
+                          InkWell(
+                            onTap: () {
+                              _eliminarDelCarrito(index);
+                              setModalState?.call(() {});
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Icon(Icons.close, size: 16, color: Colors.red[400]),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -716,7 +790,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -730,7 +804,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[50],
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -788,10 +862,59 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
             _filtrarProductos();
           });
         },
-        selectedColor: Colors.deepPurple[100],
-        checkmarkColor: Colors.deepPurple,
+        selectedColor: Theme.of(context).brightness == Brightness.dark ? Colors.deepPurple[700] : Colors.deepPurple[100],
+        checkmarkColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple,
       ),
     );
+  }
+
+  IconData _getIconoCategoria(String? categoriaNombre) {
+    switch (categoriaNombre?.toLowerCase()) {
+      case 'bebidas':
+        return Icons.local_bar;
+      case 'refrescos':
+        return Icons.liquor;
+      case 'aguas':
+        return Icons.water_drop;
+      case 'papitas':
+        return Icons.fastfood;
+      case 'lácteos':
+        return Icons.icecream;
+      case 'carne procesada':
+        return Icons.set_meal;
+      case 'pan':
+        return Icons.bakery_dining;
+      case 'tortillas':
+        return Icons.breakfast_dining;
+      case 'dulces':
+        return Icons.cookie;
+      case 'limpieza':
+        return Icons.cleaning_services;
+      case 'higiene personal':
+        return Icons.soap;
+      case 'cigarros':
+        return Icons.smoking_rooms;
+      case 'frutas y verduras':
+        return Icons.eco;
+      case 'despensa':
+        return Icons.shelves;
+      case 'cocina':
+        return Icons.restaurant;
+      case 'harinas':
+        return Icons.grain;
+      case 'enlatado':
+        return Icons.takeout_dining;
+      case 'hielo':
+        return Icons.ac_unit;
+      case 'mascotas':
+        return Icons.pets;
+      case 'medicamentos':
+        return Icons.medication;
+      case 'desechables':
+        return Icons.takeout_dining_outlined;
+      default:
+        return Icons.shopping_bag;
+    }
   }
 
   Widget _buildProductoItem(Producto producto) {
@@ -816,7 +939,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
             ),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(Icons.shopping_bag, color: Colors.white, size: 18),
+          child: Icon(_getIconoCategoria(producto.categoriaNombre), color: Colors.white, size: 18),
         ),
         title: Row(
           children: [
@@ -825,7 +948,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
-                  color: Colors.orange[100],
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.orange.withValues(alpha: 0.2) : Colors.orange[100],
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text('★ Frecuente', style: TextStyle(fontSize: 8, color: Colors.orange, fontWeight: FontWeight.bold)),
@@ -846,6 +969,15 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
               Text(
                 'Stock: ${producto.stock}',
                 style: TextStyle(fontSize: 10, color: producto.stock! <= 5 ? Colors.red : Colors.grey[600]),
+              ),
+            ],
+            if (producto.esStockPorPeso && producto.stockGramos != null) ...[
+              const SizedBox(width: 6),
+              Text(
+                producto.stockGramos! >= 1000
+                    ? '${(producto.stockGramos! / 1000).toStringAsFixed(1)} kg'
+                    : '${producto.stockGramos!.toStringAsFixed(0)} g',
+                style: const TextStyle(fontSize: 10, color: Colors.teal),
               ),
             ],
           ],
@@ -922,9 +1054,9 @@ class _PagoBottomSheetState extends State<PagoBottomSheet> {
 
     return Container(
       margin: const EdgeInsets.all(8),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -934,18 +1066,23 @@ class _PagoBottomSheetState extends State<PagoBottomSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Procesar Pago', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                Text('Procesar Pago', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.deepPurple[50],
+                    gradient: LinearGradient(
+                      colors: [Colors.deepPurple.withValues(alpha: 0.12), Colors.deepPurple.withValues(alpha: 0.05)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total a pagar', style: TextStyle(fontSize: 14)),
+                      Text('Total a pagar', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
                       Text(
                         formatoCurrency.format(widget.total),
                         style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.deepPurple),
@@ -954,6 +1091,26 @@ class _PagoBottomSheetState extends State<PagoBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.payments_outlined, size: 20, color: Colors.green[700]),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Billetes:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -1014,14 +1171,16 @@ class _PagoBottomSheetState extends State<PagoBottomSheet> {
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: _cambio >= 0 ? Colors.green[50] : Colors.red[50],
+                    color: _cambio >= 0
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _cambio >= 0 ? Colors.green[300]! : Colors.red[300]!),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Cambio:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('Cambio:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
                       Text(
                         formatoCurrency.format(_cambio.abs()),
                         style: TextStyle(

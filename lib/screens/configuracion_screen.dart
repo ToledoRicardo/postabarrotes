@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/categoria.dart';
 import '../services/database_helper.dart';
 import '../services/user_profile_service.dart';
@@ -24,6 +25,8 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   String? _userName;
   String? _businessName;
   final Set<int> _categoriasExpandidas = {};
+  int _paginaCategorias = 0;
+  static const int _tamanoPaginaCategorias = 5;
 
   @override
   void initState() {
@@ -47,8 +50,25 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     setState(() {
       _categoriasBase = categoriasBase;
       _subcategorias = subcategorias;
+      _paginaCategorias = _paginaCategorias.clamp(0, _totalPaginasCategorias() > 0 ? _totalPaginasCategorias() - 1 : 0);
       _isLoading = false;
     });
+  }
+
+  List<Categoria> _categoriasPaginadas() {
+    if (_categoriasBase.isEmpty) return [];
+    final total = _totalPaginasCategorias();
+    final pagina = _paginaCategorias.clamp(0, total - 1);
+    final inicio = pagina * _tamanoPaginaCategorias;
+    final fin = (inicio + _tamanoPaginaCategorias) > _categoriasBase.length
+        ? _categoriasBase.length
+        : (inicio + _tamanoPaginaCategorias);
+    return _categoriasBase.sublist(inicio, fin);
+  }
+
+  int _totalPaginasCategorias() {
+    if (_categoriasBase.isEmpty) return 0;
+    return (_categoriasBase.length / _tamanoPaginaCategorias).ceil();
   }
 
   void _mostrarDialogoNuevaCategoria({Categoria? categoriaPadre}) {
@@ -73,7 +93,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.deepPurple[50],
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.deepPurple.withValues(alpha: 0.15)
+                        : Colors.deepPurple[50],
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -100,12 +122,11 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                   labelText: 'Nombre',
                   hintText: categoriaPadre == null
                       ? 'Ej: Bebidas, Abarrotes'
-                      : 'Ej: FEMSA, Coca-Cola',
+                      : 'Ej: Marca / Variante',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
                 ),
                 autofocus: true,
               ),
@@ -191,7 +212,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
                   prefixIcon: Icon(
                     esNombreUsuario ? Icons.person_outline : Icons.store_outlined,
                     color: esNombreUsuario ? Colors.deepPurple : Colors.orange,
@@ -247,13 +267,21 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   }
 
   Future<void> _crearBackup() async {
+    // Permitir al usuario seleccionar la carpeta de destino
+    final selectedDir = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Selecciona la carpeta para guardar el respaldo',
+    );
+    
+    if (selectedDir == null) return; // El usuario canceló
+    
     setState(() => _isBackingUp = true);
     try {
-      final ruta = await _dbHelper.crearBackupLocal();
+      final ruta = await _dbHelper.crearBackupLocal(destDir: selectedDir);
       if (!mounted) return;
+      final nombreArchivo = ruta.split(Platform.pathSeparator).last;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Respaldo guardado exitosamente:\n${ruta.split('/').last}'),
+          content: Text('Respaldo guardado:\n$nombreArchivo\nen: $selectedDir'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 4),
         ),
@@ -412,12 +440,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Configuración',
             style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
         elevation: 0,
       ),
       body: _isLoading
@@ -441,7 +466,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                 const SizedBox(height: 16),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
@@ -537,7 +562,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                 const SizedBox(height: 16),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
@@ -549,7 +574,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                   ),
                   child: Column(
                     children: [
-                      ..._categoriasBase.asMap().entries.map((entry) {
+                      ..._categoriasPaginadas().asMap().entries.map((entry) {
                         final index = entry.key;
                         final cat = entry.value;
                         final subcats = _subcategorias
@@ -566,12 +591,23 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: cat.color != null
-                                      ? _hexToColor(cat.color!)
-                                      : Colors.deepPurple,
+                                  gradient: LinearGradient(
+                                    colors: cat.color != null
+                                        ? [_hexToColor(cat.color!), _hexToColor(cat.color!).withValues(alpha: 0.7)]
+                                        : [Colors.deepPurple, Colors.deepPurple[300]!],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
                                   borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (cat.color != null ? _hexToColor(cat.color!) : Colors.deepPurple).withValues(alpha: 0.3),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                                child: const Icon(Icons.category,
+                                child: Icon(_getIconoCategoria(cat.nombre),
                                     color: Colors.white, size: 20),
                               ),
                               title: Text(
@@ -623,8 +659,32 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                                   IconButton(
                                     icon: const Icon(Icons.delete, color: Colors.red),
                                     onPressed: () async {
-                                      await _dbHelper.deleteCategoria(cat.id!);
-                                      _cargarCategorias();
+                                      final confirmar = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                          title: const Text('Eliminar categoría'),
+                                          content: Text('¿Está seguro de eliminar "${cat.nombre}" y todas sus subcategorías?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx, false),
+                                              child: const Text('Cancelar'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () => Navigator.pop(ctx, true),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.red,
+                                                foregroundColor: Colors.white,
+                                              ),
+                                              child: const Text('Eliminar'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirmar == true) {
+                                        await _dbHelper.deleteCategoria(cat.id!);
+                                        _cargarCategorias();
+                                      }
                                     },
                                   ),
                                 ],
@@ -652,8 +712,32 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                                         icon: const Icon(Icons.delete_outline,
                                             color: Colors.red, size: 20),
                                         onPressed: () async {
-                                          await _dbHelper.deleteCategoria(subcat.id!);
-                                          _cargarCategorias();
+                                          final confirmar = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                              title: const Text('Eliminar subcategoría'),
+                                              content: Text('¿Está seguro de eliminar "${subcat.nombre}"?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(ctx, false),
+                                                  child: const Text('Cancelar'),
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed: () => Navigator.pop(ctx, true),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.red,
+                                                    foregroundColor: Colors.white,
+                                                  ),
+                                                  child: const Text('Eliminar'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirmar == true) {
+                                            await _dbHelper.deleteCategoria(subcat.id!);
+                                            _cargarCategorias();
+                                          }
                                         },
                                       ),
                                       dense: true,
@@ -666,7 +750,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                                   : CrossFadeState.showFirst,
                               duration: const Duration(milliseconds: 200),
                             ),
-                            if (index < _categoriasBase.length - 1)
+                            if (index < _categoriasPaginadas().length - 1)
                               const Divider(height: 1),
                           ],
                         );
@@ -674,7 +758,34 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                if (_totalPaginasCategorias() > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          onPressed: _paginaCategorias > 0
+                              ? () => setState(() => _paginaCategorias -= 1)
+                              : null,
+                          icon: const Icon(Icons.chevron_left),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Text(
+                          '${_paginaCategorias + 1} / ${_totalPaginasCategorias()}',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        IconButton(
+                          onPressed: (_paginaCategorias + 1) < _totalPaginasCategorias()
+                              ? () => setState(() => _paginaCategorias += 1)
+                              : null,
+                          icon: const Icon(Icons.chevron_right),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  ),
                 ElevatedButton.icon(
                   onPressed: _mostrarDialogoNuevaCategoria,
                   icon: const Icon(Icons.add),
@@ -769,7 +880,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Los respaldos se guardan en la carpeta de documentos de la app.',
+                        'Selecciona una carpeta para guardar el archivo de la base de datos completa.',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
@@ -864,7 +975,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
@@ -909,7 +1020,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
@@ -925,7 +1036,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                       const Divider(),
                       _buildInfoTile(
                         'Prueba gratuita',
-                        'Termina en 2 meses. Ejemplo: si instalas hoy, termina el 06/04/2026.',
+                        _getMensajePruebaGratuita(),
                       ),
                       const Divider(),
                       _buildInfoTile('Nombre', 'Tienda de Abarrotes'),
@@ -1002,7 +1113,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
               softWrap: true,
               style: TextStyle(
                 fontSize: 15,
-                color: Colors.grey[700],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey[400]
+                    : Colors.grey[700],
               ),
             ),
           ),
@@ -1011,10 +1124,66 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     );
   }
 
+  String _getMensajePruebaGratuita() {
+    final now = DateTime.now();
+    final fin = DateTime(now.year, now.month + 1, now.day);
+    final formato = DateFormat('dd/MM/yyyy');
+    return 'Tu prueba gratuita termina el ${formato.format(fin)}.';
+  }
+
   Color _hexToColor(String hexString) {
     final buffer = StringBuffer();
     if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
     buffer.write(hexString.replaceFirst('#', ''));
     return Color(int.parse(buffer.toString(), radix: 16));
+  }
+
+  IconData _getIconoCategoria(String? categoriaNombre) {
+    switch (categoriaNombre?.toLowerCase()) {
+      case 'bebidas':
+        return Icons.local_bar;
+      case 'refrescos':
+        return Icons.liquor;
+      case 'aguas':
+        return Icons.water_drop;
+      case 'papitas':
+        return Icons.fastfood;
+      case 'lácteos':
+        return Icons.icecream;
+      case 'carne procesada':
+        return Icons.set_meal;
+      case 'pan':
+        return Icons.bakery_dining;
+      case 'tortillas':
+        return Icons.breakfast_dining;
+      case 'dulces':
+        return Icons.cookie;
+      case 'limpieza':
+        return Icons.cleaning_services;
+      case 'higiene personal':
+        return Icons.soap;
+      case 'cigarros':
+        return Icons.smoking_rooms;
+      case 'frutas y verduras':
+        return Icons.eco;
+      case 'despensa':
+        return Icons.shelves;
+      case 'cocina':
+        return Icons.restaurant;
+      case 'harinas':
+        return Icons.grain;
+      case 'enlatado':
+        return Icons.takeout_dining;
+      case 'hielo':
+        return Icons.ac_unit;
+      case 'mascotas':
+        return Icons.pets;
+      case 'medicamentos':
+        return Icons.medication;
+      case 'desechables':
+        return Icons.takeout_dining_outlined;
+      default:
+        return Icons.category;
+    }
   }
 }

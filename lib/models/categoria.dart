@@ -54,13 +54,16 @@ class Categoria {
       Categoria(nombre: 'Refrescos', color: '#F44336'),
       Categoria(nombre: 'Aguas', color: '#00BCD4'),
       Categoria(nombre: 'Dulces', color: '#E91E63'),
-      Categoria(nombre: 'Pan y Tortillas', color: '#FFB74D'),
+      Categoria(nombre: 'Pan', color: '#FFB74D'),
+      Categoria(nombre: 'Tortillas', color: '#8D6E63'),
       Categoria(nombre: 'Higiene personal', color: '#8BC34A'),
       Categoria(nombre: 'Limpieza', color: '#00ACC1'),
       Categoria(nombre: 'Cigarros', color: '#607D8B'),
-      Categoria(nombre: 'GAMESA', color: '#795548'),
-      Categoria(nombre: 'BIMBO', color: '#FFC107'),
       Categoria(nombre: 'Frutas y Verduras', color: '#4CAF50'),
+      Categoria(nombre: 'Hielo', color: '#81D4FA'),
+      Categoria(nombre: 'Mascotas', color: '#A1887F'),
+      Categoria(nombre: 'Medicamentos', color: '#EF5350'),
+      Categoria(nombre: 'Desechables', color: '#78909C'),
     ];
   }
 }

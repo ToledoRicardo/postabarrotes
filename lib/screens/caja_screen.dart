@@ -21,6 +21,8 @@ class _CajaScreenState extends State<CajaScreen> {
   double _totalEgresos = 0;
   double _saldoCaja = 0;
   double? _fondoInicial;
+  int _paginaMovimientos = 0;
+  static const int _tamanoPaginaMovimientos = 5;
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _CajaScreenState extends State<CajaScreen> {
       _totalEgresos = egresos;
       _fondoInicial = fondo;
       _saldoCaja = (fondo ?? 0) + ventas + ingresos - egresos;
+      _paginaMovimientos = 0;
       _isLoading = false;
     });
   }
@@ -131,13 +134,11 @@ class _CajaScreenState extends State<CajaScreen> {
   Widget build(BuildContext context) {
     final formatoCurrency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
     final formatoFecha = DateFormat('dd/MM/yyyy');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Caja', style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
         elevation: 0,
         actions: [
           if (_fondoInicial == null)
@@ -148,14 +149,14 @@ class _CajaScreenState extends State<CajaScreen> {
                 children: [
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 160),
-                    child: const Text(
+                    child: Text(
                       'Ingresa el fondo de hoy',
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, color: Colors.black54),
+                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.arrow_right_alt, size: 18, color: Colors.black54),
+                  Icon(Icons.arrow_right_alt, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   IconButton(
                     icon: const Icon(Icons.account_balance_wallet),
                     onPressed: _mostrarDialogoFondo,
@@ -186,7 +187,7 @@ class _CajaScreenState extends State<CajaScreen> {
           : Column(
               children: [
                 Container(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
@@ -265,9 +266,9 @@ class _CajaScreenState extends State<CajaScreen> {
                           margin: const EdgeInsets.only(bottom: 16),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.blue[50],
+                            color: isDark ? Colors.blue.withValues(alpha: 0.15) : Colors.blue[50],
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.blue[200]!),
+                            border: Border.all(color: isDark ? Colors.blue.withValues(alpha: 0.4) : Colors.blue[200]!),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -341,12 +342,12 @@ class _CajaScreenState extends State<CajaScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         'Movimientos',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const Spacer(),
@@ -379,18 +380,67 @@ class _CajaScreenState extends State<CajaScreen> {
                             ],
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: _movimientos.length,
-                          itemBuilder: (context, index) {
-                            final mov = _movimientos[index];
-                            return _buildMovimientoCard(mov);
-                          },
+                      : Column(
+                          children: [
+                            Expanded(
+                              child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                itemCount: _movimientosPaginados().length,
+                                itemBuilder: (context, index) {
+                                  final mov = _movimientosPaginados()[index];
+                                  return _buildMovimientoCard(mov);
+                                },
+                              ),
+                            ),
+                            if (_totalPaginasMovimientos() > 1)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    IconButton(
+                                      onPressed: _paginaMovimientos > 0
+                                          ? () => setState(() => _paginaMovimientos -= 1)
+                                          : null,
+                                      icon: const Icon(Icons.chevron_left),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    Text(
+                                      '${_paginaMovimientos + 1} / ${_totalPaginasMovimientos()}',
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                    ),
+                                    IconButton(
+                                      onPressed: (_paginaMovimientos + 1) < _totalPaginasMovimientos()
+                                          ? () => setState(() => _paginaMovimientos += 1)
+                                          : null,
+                                      icon: const Icon(Icons.chevron_right),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                 ),
               ],
             ),
     );
+  }
+
+  List<MovimientoCaja> _movimientosPaginados() {
+    if (_movimientos.isEmpty) return [];
+    final totalPaginas = _totalPaginasMovimientos();
+    final pagina = _paginaMovimientos.clamp(0, totalPaginas - 1);
+    final inicio = pagina * _tamanoPaginaMovimientos;
+    final fin = (inicio + _tamanoPaginaMovimientos) > _movimientos.length
+        ? _movimientos.length
+        : (inicio + _tamanoPaginaMovimientos);
+    return _movimientos.sublist(inicio, fin);
+  }
+
+  int _totalPaginasMovimientos() {
+    if (_movimientos.isEmpty) return 0;
+    return (_movimientos.length / _tamanoPaginaMovimientos).ceil();
   }
 
   Widget _buildSaldoActionButton({
@@ -438,7 +488,7 @@ class _CajaScreenState extends State<CajaScreen> {
             titulo,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[700],
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[700],
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -485,7 +535,7 @@ class _CajaScreenState extends State<CajaScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -634,7 +684,6 @@ class _NuevoMovimientoDialogState extends State<NuevoMovimientoDialog> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
@@ -659,7 +708,6 @@ class _NuevoMovimientoDialogState extends State<NuevoMovimientoDialog> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
                 ),
               ),
               const SizedBox(height: 16),
@@ -671,7 +719,6 @@ class _NuevoMovimientoDialogState extends State<NuevoMovimientoDialog> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
                 ),
                 maxLines: 3,
               ),

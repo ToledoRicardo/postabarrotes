@@ -38,6 +38,10 @@ class MainApp extends StatelessWidget {
             ),
             useMaterial3: true,
             fontFamily: 'Roboto',
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: Colors.grey[50],
+            ),
           ),
           darkTheme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
@@ -46,6 +50,10 @@ class MainApp extends StatelessWidget {
             ),
             useMaterial3: true,
             fontFamily: 'Roboto',
+            inputDecorationTheme: const InputDecorationTheme(
+              filled: true,
+              fillColor: Color(0xFF2C2C3E),
+            ),
           ),
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
           home: const HomeScreen(),
@@ -120,7 +128,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange[100],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.orange.withValues(alpha: 0.2)
+                    : Colors.orange[100],
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(Icons.person_add, color: Colors.orange[700], size: 28),
@@ -146,7 +156,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.deepPurple[50],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.deepPurple.withValues(alpha: 0.15)
+                    : Colors.deepPurple[50],
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(

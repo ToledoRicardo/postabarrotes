@@ -28,15 +28,16 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 10,
+      version: 13,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
-  /// Crea un respaldo local de la base de datos en la carpeta de documentos.
+  /// Crea un respaldo local de la base de datos.
+  /// Si se proporciona [destDir], guarda en dicha carpeta; si no, usa la carpeta de documentos de la app.
   /// Retorna la ruta del archivo de respaldo.
-  Future<String> crearBackupLocal() async {
+  Future<String> crearBackupLocal({String? destDir}) async {
     final db = await database;
     final dbPath = await getDatabasesPath();
     final originalPath = join(dbPath, 'tienda_barrotes.db');
@@ -44,8 +45,13 @@ class DatabaseHelper {
     // Cerrar la base de datos temporalmente para copiar el archivo limpio
     await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
     
-    final docsDir = await getApplicationDocumentsDirectory();
-    final backupDir = Directory(join(docsDir.path, 'backups'));
+    late final Directory backupDir;
+    if (destDir != null) {
+      backupDir = Directory(destDir);
+    } else {
+      final docsDir = await getApplicationDocumentsDirectory();
+      backupDir = Directory(join(docsDir.path, 'backups'));
+    }
     if (!await backupDir.exists()) {
       await backupDir.create(recursive: true);
     }
@@ -263,6 +269,47 @@ class DatabaseHelper {
         }
       }
     }
+
+    if (oldVersion < 11) {
+      // Agregar columna marca a productos
+      await db.execute('''
+        ALTER TABLE productos ADD COLUMN marca TEXT
+      ''');
+    }
+
+    if (oldVersion < 12) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS devoluciones (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          producto_id INTEGER NOT NULL,
+          producto_nombre TEXT NOT NULL,
+          cantidad INTEGER NOT NULL,
+          monto REAL NOT NULL,
+          concepto TEXT,
+          fecha TEXT NOT NULL,
+          FOREIGN KEY (producto_id) REFERENCES productos (id)
+        )
+      ''');
+    }
+
+    if (oldVersion < 13) {
+      await db.execute('''
+        ALTER TABLE productos ADD COLUMN es_stock_por_peso INTEGER DEFAULT 0
+      ''');
+      await db.execute('''
+        ALTER TABLE productos ADD COLUMN stock_gramos REAL
+      ''');
+
+      // Agregar categoría Hielo si no existe
+      final hieloExiste = await db.query(
+        'categorias',
+        where: 'nombre = ?',
+        whereArgs: ['Hielo'],
+      );
+      if (hieloExiste.isEmpty) {
+        await db.insert('categorias', Categoria(nombre: 'Hielo', color: '#81D4FA').toMap());
+      }
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -288,6 +335,9 @@ class DatabaseHelper {
         subcategoria_id INTEGER,
         es_precio_por_peso INTEGER DEFAULT 0,
         es_frecuente INTEGER DEFAULT 0,
+        es_stock_por_peso INTEGER DEFAULT 0,
+        stock_gramos REAL,
+        marca TEXT,
         fecha_creacion TEXT NOT NULL,
         FOREIGN KEY (categoria_id) REFERENCES categorias (id),
         FOREIGN KEY (subcategoria_id) REFERENCES categorias (id)
@@ -385,6 +435,19 @@ class DatabaseHelper {
         monto_real REAL NOT NULL,
         diferencia REAL NOT NULL,
         notas TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE devoluciones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto_id INTEGER NOT NULL,
+        producto_nombre TEXT NOT NULL,
+        cantidad INTEGER NOT NULL,
+        monto REAL NOT NULL,
+        concepto TEXT,
+        fecha TEXT NOT NULL,
+        FOREIGN KEY (producto_id) REFERENCES productos (id)
       )
     ''');
 
@@ -568,6 +631,40 @@ class DatabaseHelper {
     );
   }
 
+  Future<int> updateProductoStockGramos(int id, double gramos) async {
+    final db = await database;
+    return await db.update(
+      'productos',
+      {'stock_gramos': gramos},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> updateProductoMarca(List<int> ids, String? marca) async {
+    final db = await database;
+    for (final id in ids) {
+      await db.update(
+        'productos',
+        {'marca': marca},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+  }
+
+  Future<void> updateProductoStockBatch(Map<int, int> stockMap) async {
+    final db = await database;
+    for (final entry in stockMap.entries) {
+      await db.update(
+        'productos',
+        {'stock': entry.value},
+        where: 'id = ?',
+        whereArgs: [entry.key],
+      );
+    }
+  }
+
   // PROVEEDORES
   Future<int> insertProveedor(Proveedor proveedor) async {
     final db = await database;
@@ -661,6 +758,34 @@ class DatabaseHelper {
       ORDER BY c.id ASC
     ''', [groupId]);
     return result.map((map) => CompraItem.fromMap(map)).toList();
+  }
+
+  Future<void> deleteCompraGroup(String groupId) async {
+    final db = await database;
+    
+    // Obtener items de la compra para revertir el stock
+    final items = await db.rawQuery('''
+      SELECT producto_id, cantidad FROM compras
+      WHERE COALESCE(compra_group_id, CAST(id AS TEXT)) = ?
+    ''', [groupId]);
+    
+    // Revertir stock de cada producto
+    for (final item in items) {
+      final productoId = (item['producto_id'] as num).toInt();
+      final cantidad = (item['cantidad'] as num).toInt();
+      final producto = await getProducto(productoId);
+      if (producto != null && producto.stock != null) {
+        final nuevoStock = producto.stock! - cantidad;
+        await updateProductoStock(productoId, nuevoStock < 0 ? 0 : nuevoStock);
+      }
+    }
+    
+    // Eliminar los registros de compra
+    await db.delete(
+      'compras',
+      where: 'COALESCE(compra_group_id, CAST(id AS TEXT)) = ?',
+      whereArgs: [groupId],
+    );
   }
 
   // VENTAS
@@ -948,6 +1073,64 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // DEVOLUCIONES
+  Future<int> insertDevolucion({
+    required int productoId,
+    required String productoNombre,
+    required int cantidad,
+    required double monto,
+    String? concepto,
+  }) async {
+    final db = await database;
+    final fecha = DateTime.now().toIso8601String();
+
+    final devId = await db.insert('devoluciones', {
+      'producto_id': productoId,
+      'producto_nombre': productoNombre,
+      'cantidad': cantidad,
+      'monto': monto,
+      'concepto': concepto,
+      'fecha': fecha,
+    });
+
+    // Registrar como egreso en caja (monto negativo conceptualmente)
+    await insertMovimientoCaja(MovimientoCaja(
+      tipo: 'egreso',
+      monto: monto,
+      concepto: 'Devolución: $productoNombre${concepto != null && concepto.isNotEmpty ? ' - $concepto' : ''}',
+    ));
+
+    return devId;
+  }
+
+  Future<List<Map<String, dynamic>>> getDevolucionesPorFecha(DateTime fecha) async {
+    final db = await database;
+    final inicioDia = DateTime(fecha.year, fecha.month, fecha.day);
+    final finDia = inicioDia.add(const Duration(days: 1));
+
+    final result = await db.query(
+      'devoluciones',
+      where: 'fecha >= ? AND fecha < ?',
+      whereArgs: [inicioDia.toIso8601String(), finDia.toIso8601String()],
+      orderBy: 'fecha DESC',
+    );
+    return result;
+  }
+
+  Future<double> getTotalDevolucionesDia(DateTime fecha) async {
+    final db = await database;
+    final inicioDia = DateTime(fecha.year, fecha.month, fecha.day);
+    final finDia = inicioDia.add(const Duration(days: 1));
+
+    final result = await db.rawQuery('''
+      SELECT SUM(monto) as total
+      FROM devoluciones
+      WHERE fecha >= ? AND fecha < ?
+    ''', [inicioDia.toIso8601String(), finDia.toIso8601String()]);
+
+    return result.first['total'] as double? ?? 0.0;
   }
 
   Future<void> close() async {
