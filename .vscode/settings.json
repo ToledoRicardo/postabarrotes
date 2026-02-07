@@ -1,0 +1,7 @@
+{
+  "files.exclude": {
+    "third_party/**/android/**/*.kt": true,
+    "third_party/**/android/.gradle": true
+  },
+  "kotlin.languageServer.enabled": false
+}

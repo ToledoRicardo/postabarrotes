@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import '../services/image_saver_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:screenshot/screenshot.dart';
 import '../models/movimiento_caja.dart';
@@ -22,7 +22,7 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
   final _notasController = TextEditingController();
   final ScreenshotController _screenshotController = ScreenshotController();
   
-  DateTime _fecha = DateTime.now();
+  final DateTime _fecha = DateTime.now();
   bool _isLoading = true;
   double _totalVentas = 0;
   double _totalIngresos = 0;
@@ -135,12 +135,9 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
         ),
         pixelRatio: 2.0,
       );
-      if (image == null) {
-        throw Exception('No se pudo generar la imagen');
-      }
 
       final nombre = 'corte_${DateFormat('yyyyMMdd_HHmmss').format(_fecha)}';
-      final result = await ImageGallerySaver.saveImage(
+      final result = await ImageSaverService.saveImage(
         image,
         quality: 100,
         name: nombre,
@@ -204,7 +201,6 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
     final formatoCurrency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
     final montoReal = double.tryParse(_montoRealController.text) ?? 0;
     _montoEsperado = _totalVentas + _totalIngresos - _totalEgresos;
-    final diferencia = montoReal - _montoEsperado;
     final analisisTecnico = _getAnalisisTecnico();
 
     return Scaffold(
@@ -298,7 +294,7 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -396,6 +392,7 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
+                color: Colors.black87,
               ),
             ),
           ],
@@ -425,6 +422,7 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
+              color: Colors.black87,
             ),
           ),
           Text(
@@ -432,6 +430,7 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
           ),
         ],
@@ -445,259 +444,275 @@ class _CorteDiaScreenState extends State<CorteDiaScreen> {
     String analisisTecnico,
   ) {
     final diferencia = montoReal - _montoEsperado;
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.deepPurple, Colors.deepPurple[300]!],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
+    return MediaQuery(
+      data: const MediaQueryData(),
+      child: Material(
+        color: Colors.white,
+        child: Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(20),
+          child: DefaultTextStyle(
+            style: const TextStyle(
+              color: Colors.black87,
+              fontFamily: 'Roboto',
+              fontSize: 14,
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  width: 80,
-                  height: 80,
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.all(8),
-                  child: Image.asset(
-                    'assets/images/TiendaDeAbarrotesd.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _businessName ?? 'Tienda de Abarrotes',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'CORTE DE CAJA',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                    letterSpacing: 2,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    gradient: LinearGradient(
+                      colors: [Colors.deepPurple, Colors.deepPurple[300]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Column(
                     children: [
-                      const Icon(Icons.calendar_today, color: Colors.white, size: 16),
-                      const SizedBox(width: 8),
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: Image.asset(
+                          'assets/images/TiendaDeAbarrotesd.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Text(
-                        DateFormat('dd/MM/yyyy').format(_fecha),
+                        _businessName ?? 'Tienda de Abarrotes',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                    ],
-                  ),
-                ),
-                if (_userName != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.person, color: Colors.white70, size: 16),
-                      const SizedBox(width: 6),
+                      const SizedBox(height: 8),
                       Text(
-                        'Encargado: $_userName',
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        'CORTE DE CAJA',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 14,
+                          letterSpacing: 2,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.calendar_today, color: Colors.white, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              DateFormat('dd/MM/yyyy').format(_fecha),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_userName != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.person, color: Colors.white70, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Encargado: $_userName',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Resumen del Dia',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[300]!),
                   ),
-                ),
-                const SizedBox(height: 16),
-                _buildResumenRow('Ventas', _totalVentas, Colors.green),
-                const SizedBox(height: 12),
-                _buildResumenRow('Ingresos', _totalIngresos, Colors.blue),
-                const SizedBox(height: 12),
-                _buildResumenRow('Egresos', _totalEgresos, Colors.red),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Detalles del Corte',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildDetalleRow('Monto Esperado', _montoEsperado),
-                _buildDetalleRow('Dinero en caja', montoReal),
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      diferencia >= 0 ? 'Sobrante' : 'Faltante',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      formatoCurrency.format(diferencia.abs()),
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: diferencia >= 0 ? Colors.green : Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.analytics, color: Colors.orange[700], size: 24),
-                const SizedBox(width: 12),
-                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Analisis Tecnico',
+                      const Text(
+                        'Resumen del Dia',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange[900],
+                          color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        analisisTecnico,
+                      const SizedBox(height: 16),
+                      _buildResumenRow('Ventas', _totalVentas, Colors.green),
+                      const SizedBox(height: 12),
+                      _buildResumenRow('Ingresos', _totalIngresos, Colors.blue),
+                      const SizedBox(height: 12),
+                      _buildResumenRow('Egresos', _totalEgresos, Colors.red),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Detalles del Corte',
                         style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.orange[800],
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildDetalleRow('Monto Esperado', _montoEsperado),
+                      _buildDetalleRow('Dinero en caja', montoReal),
+                      const Divider(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            diferencia >= 0 ? 'Sobrante' : 'Faltante',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            formatoCurrency.format(diferencia.abs()),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: diferencia >= 0 ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.analytics, color: Colors.orange[700], size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Analisis Tecnico',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange[900],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              analisisTecnico,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.orange[800],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          if (_notasController.text.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.note, color: Colors.blue[700], size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Notas',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[900],
+                if (_notasController.text.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.note, color: Colors.blue[700], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Notas',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[900],
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _notasController.text,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.blue[800],
+                        const SizedBox(height: 8),
+                        Text(
+                          _notasController.text,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue[800],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
-          Center(
-            child: Text(
-              'Generado: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-              ),
+                const SizedBox(height: 20),
+                Center(
+                  child: Text(
+                    'Generado: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

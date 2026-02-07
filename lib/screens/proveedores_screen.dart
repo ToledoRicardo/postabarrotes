@@ -102,7 +102,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
               gradient: LinearGradient(
                 colors: [
                   theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacity(0.8),
+                  theme.colorScheme.primary.withValues(alpha: 0.8),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -154,9 +154,9 @@ class _ProveedoresScreenState extends State<ProveedoresScreen>
               setState(() => _refreshKey++);
             }
           },
-          child: const Icon(Icons.add),
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: Colors.white,
+          child: const Icon(Icons.add),
         ),
       ),
     );
@@ -416,7 +416,7 @@ class _FormProveedorScreenState extends State<FormProveedorScreen> {
             gradient: LinearGradient(
               colors: [
                 theme.colorScheme.primary,
-                theme.colorScheme.primary.withOpacity(0.8),
+                theme.colorScheme.primary.withValues(alpha: 0.8),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1052,7 +1052,7 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
             gradient: LinearGradient(
               colors: [
                 theme.colorScheme.primary,
-                theme.colorScheme.primary.withOpacity(0.8),
+                theme.colorScheme.primary.withValues(alpha: 0.8),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1090,7 +1090,7 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
 
             // Proveedor
             DropdownButtonFormField<Proveedor>(
-              value: _proveedorSeleccionado,
+              initialValue: _proveedorSeleccionado,
               decoration: InputDecoration(
                 labelText: 'Proveedor',
                 hintText: 'Seleccione un proveedor',
@@ -1155,7 +1155,7 @@ class _FormCompraScreenState extends State<FormCompraScreen> {
 
             // Producto
             DropdownButtonFormField<Producto>(
-              value: _productoSeleccionado,
+              initialValue: _productoSeleccionado,
               decoration: InputDecoration(
                 labelText: 'Producto',
                 hintText: 'Seleccione un producto',

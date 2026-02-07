@@ -6,6 +6,18 @@ allprojects {
 }
 
 subprojects {
+    tasks.withType<JavaCompile>().configureEach {
+        sourceCompatibility = JavaVersion.VERSION_11.toString()
+        targetCompatibility = JavaVersion.VERSION_11.toString()
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            jvmTarget = JavaVersion.VERSION_11.toString()
+        }
+    }
+}
+
+subprojects {
     afterEvaluate {
         if (plugins.hasPlugin("com.android.library")) {
             val safeName = name.replace('-', '_')
@@ -16,6 +28,18 @@ subprojects {
                     val setNamespace = ext.javaClass.getMethod("setNamespace", String::class.java)
                     setNamespace.invoke(ext, "com.github.flutter.$safeName")
                 }
+            }
+        }
+    }
+}
+
+subprojects {
+    afterEvaluate {
+        if (plugins.hasPlugin("com.android.library") || plugins.hasPlugin("com.android.application")) {
+            val androidExt = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+            androidExt?.compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_11
+                targetCompatibility = JavaVersion.VERSION_11
             }
         }
     }

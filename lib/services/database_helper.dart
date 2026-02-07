@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/producto.dart';
 import '../models/proveedor.dart';
 import '../models/compra.dart';
@@ -30,6 +32,60 @@ class DatabaseHelper {
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  /// Crea un respaldo local de la base de datos en la carpeta de documentos.
+  /// Retorna la ruta del archivo de respaldo.
+  Future<String> crearBackupLocal() async {
+    final db = await database;
+    final dbPath = await getDatabasesPath();
+    final originalPath = join(dbPath, 'tienda_barrotes.db');
+    
+    // Cerrar la base de datos temporalmente para copiar el archivo limpio
+    await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
+    
+    final docsDir = await getApplicationDocumentsDirectory();
+    final backupDir = Directory(join(docsDir.path, 'backups'));
+    if (!await backupDir.exists()) {
+      await backupDir.create(recursive: true);
+    }
+    
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final backupPath = join(backupDir.path, 'tienda_backup_$timestamp.db');
+    
+    final originalFile = File(originalPath);
+    await originalFile.copy(backupPath);
+    
+    return backupPath;
+  }
+  
+  /// Restaura la base de datos desde un archivo de respaldo.
+  Future<void> restaurarBackup(String backupPath) async {
+    final db = await database;
+    await db.close();
+    _database = null;
+    
+    final dbPath = await getDatabasesPath();
+    final originalPath = join(dbPath, 'tienda_barrotes.db');
+    
+    final backupFile = File(backupPath);
+    await backupFile.copy(originalPath);
+    
+    // Reabrir la base de datos
+    _database = await _initDB('tienda_barrotes.db');
+  }
+  
+  /// Obtiene la lista de backups disponibles.
+  Future<List<FileSystemEntity>> getBackupsDisponibles() async {
+    final docsDir = await getApplicationDocumentsDirectory();
+    final backupDir = Directory(join(docsDir.path, 'backups'));
+    if (!await backupDir.exists()) return [];
+    
+    final files = backupDir.listSync()
+        .where((f) => f.path.endsWith('.db'))
+        .toList();
+    files.sort((a, b) => b.path.compareTo(a.path));
+    return files;
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {

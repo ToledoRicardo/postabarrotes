@@ -1,9 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class UserProfileService {
+class UserProfileService extends ChangeNotifier {
   static const String _keyUserName = 'user_name';
   static const String _keyBusinessName = 'business_name';
   static const String _keyLastProfileCheck = 'last_profile_check';
+  static const String _keyDarkMode = 'dark_mode';
   
   static UserProfileService? _instance;
   static SharedPreferences? _prefs;
@@ -69,5 +71,16 @@ class UserProfileService {
     await _prefs!.remove(_keyBusinessName);
     await _prefs!.remove(_keyLastProfileCheck);
     return true;
+  }
+  
+  // Modo oscuro
+  bool isDarkMode() {
+    return _prefs!.getBool(_keyDarkMode) ?? false;
+  }
+  
+  Future<bool> setDarkMode(bool value) async {
+    final result = await _prefs!.setBool(_keyDarkMode, value);
+    notifyListeners();
+    return result;
   }
 }

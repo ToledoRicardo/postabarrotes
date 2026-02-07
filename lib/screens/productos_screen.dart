@@ -231,7 +231,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 8,
                                   offset: const Offset(0, 3),
                                 ),
@@ -286,7 +286,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.deepPurple.withOpacity(0.1),
+                                            color: Colors.deepPurple.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Text(
@@ -303,7 +303,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.deepPurple[200]!.withOpacity(0.3),
+                                            color: Colors.deepPurple[200]!.withValues(alpha: 0.3),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Text(
@@ -336,7 +336,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.orange.withOpacity(0.2),
+                                            color: Colors.orange.withValues(alpha: 0.2),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: const Row(
@@ -363,8 +363,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
                                               horizontal: 8, vertical: 1),
                                           decoration: BoxDecoration(
                                             color: stockBajo
-                                                ? Colors.red.withOpacity(0.1)
-                                                : Colors.blue.withOpacity(0.1),
+                                                ? Colors.red.withValues(alpha: 0.1)
+                                                : Colors.blue.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Text(
@@ -748,7 +748,7 @@ class _FormProductoScreenState extends State<FormProductoScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: unidadMedida,
+                          initialValue: unidadMedida,
                           decoration: InputDecoration(
                             labelText: 'Unidad',
                             border: OutlineInputBorder(
@@ -920,7 +920,7 @@ class _FormProductoScreenState extends State<FormProductoScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
-              value: _categoriaSeleccionada,
+              initialValue: _categoriaSeleccionada,
               decoration: InputDecoration(
                 labelText: 'Categoría',
                 border: OutlineInputBorder(
@@ -960,7 +960,7 @@ class _FormProductoScreenState extends State<FormProductoScreen> {
               Column(
                 children: [
                   DropdownButtonFormField<int>(
-                    value: _subcategoriaSeleccionada,
+                    initialValue: _subcategoriaSeleccionada,
                     decoration: InputDecoration(
                       labelText: 'Subcategoría',
                       border: OutlineInputBorder(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'screens/punto_venta_screen.dart';
 import 'screens/productos_screen.dart';
 import 'screens/proveedores_screen.dart';
@@ -8,8 +9,15 @@ import 'screens/corte_dia_screen.dart';
 import 'screens/configuracion_screen.dart';
 import 'services/user_profile_service.dart';
 
-void main() {
-  runApp(const MainApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final profileService = await UserProfileService.getInstance();
+  runApp(
+    ChangeNotifierProvider<UserProfileService>.value(
+      value: profileService,
+      child: const MainApp(),
+    ),
+  );
 }
 
 class MainApp extends StatelessWidget {
@@ -17,18 +25,32 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Punto de Venta',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-      ),
-      home: const HomeScreen(),
+    return Consumer<UserProfileService>(
+      builder: (context, profileService, _) {
+        final isDark = profileService.isDarkMode();
+        return MaterialApp(
+          title: 'Punto de Venta',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.deepPurple,
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+            fontFamily: 'Roboto',
+          ),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.deepPurple,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+            fontFamily: 'Roboto',
+          ),
+          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }
@@ -179,6 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: _getScreen(_selectedIndex),
       bottomNavigationBar: Theme(
@@ -219,13 +242,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           currentIndex: _selectedIndex,
           selectedItemColor: Colors.deepPurple,
-          unselectedItemColor: Colors.grey[400],
+          unselectedItemColor: isDark ? Colors.grey[500] : Colors.grey[400],
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
           selectedFontSize: 12,
           unselectedFontSize: 11,
           elevation: 8,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark ? Colors.grey[900] : Colors.white,
         ),
       ),
     );

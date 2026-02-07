@@ -466,7 +466,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
                                 color: Colors.white,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Colors.black.withValues(alpha: 0.05),
                                     blurRadius: 10,
                                     offset: const Offset(-2, 0),
                                   ),
@@ -503,6 +503,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
     final totalPaginas = _productosFiltrados.isEmpty
         ? 0
         : (_productosFiltrados.length / _tamanoPaginaProductos).ceil();
+    final isTablet = MediaQuery.of(context).size.width > 600;
     return _productosFiltrados.isEmpty
         ? Center(
             child: Column(
@@ -528,7 +529,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
               ),
               if (totalPaginas > 1)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: EdgeInsets.fromLTRB(12, 0, isTablet ? 12 : 80, 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -718,7 +719,7 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, -2),
               ),
