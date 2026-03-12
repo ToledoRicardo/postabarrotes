@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/categoria.dart';
 import '../services/database_helper.dart';
 import '../services/user_profile_service.dart';
@@ -16,7 +16,6 @@ class ConfiguracionScreen extends StatefulWidget {
 
 class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   final _dbHelper = DatabaseHelper.instance;
-  static const String _telefonoContacto = '8331811916';
   List<Categoria> _categoriasBase = [];
   List<Categoria> _subcategorias = [];
   bool _isLoading = true;
@@ -42,6 +41,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       _businessName = _profileService!.getBusinessName();
     });
   }
+
 
   Future<void> _cargarCategorias() async {
     setState(() => _isLoading = true);
@@ -267,6 +267,18 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   }
 
   Future<void> _crearBackup() async {
+    final permitido = await _solicitarPermisoBackup();
+    if (!permitido) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Permiso denegado para guardar el respaldo.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Permitir al usuario seleccionar la carpeta de destino
     final selectedDir = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Selecciona la carpeta para guardar el respaldo',
@@ -297,6 +309,17 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     } finally {
       if (mounted) setState(() => _isBackingUp = false);
     }
+  }
+
+  Future<bool> _solicitarPermisoBackup() async {
+    if (!Platform.isAndroid) return true;
+
+    if (await Permission.manageExternalStorage.isGranted) return true;
+    final manage = await Permission.manageExternalStorage.request();
+    if (manage.isGranted) return true;
+
+    final storage = await Permission.storage.request();
+    return storage.isGranted;
   }
 
   Future<void> _mostrarBackupsDisponibles() async {
@@ -413,28 +436,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _abrirWhatsApp() async {
-    final uri = Uri.parse('https://wa.me/52$_telefonoContacto');
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!mounted) return;
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir WhatsApp')),
-      );
-    }
-  }
-
-  Future<void> _llamarTelefono() async {
-    final uri = Uri.parse('tel:$_telefonoContacto');
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!mounted) return;
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo iniciar la llamada')),
-      );
-    }
   }
 
   @override
@@ -1034,52 +1035,8 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                     children: [
                       _buildInfoTile('Versión', '1.0.0'),
                       const Divider(),
-                      _buildInfoTile(
-                        'Prueba gratuita',
-                        _getMensajePruebaGratuita(),
-                      ),
-                      const Divider(),
                       _buildInfoTile('Nombre', 'Tienda de Abarrotes'),
-                      const Divider(),
-                      _buildInfoTile('Desarrollado por', 'Ingeniero Toledo Avalos\nRicardo Ernesto'),
-                      const Divider(),
-                      _buildInfoTile('Contacto', 'WhatsApp/Llamadas: $_telefonoContacto'),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _abrirWhatsApp,
-                              icon: const Icon(Icons.chat),
-                              label: const Text('WhatsApp'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[600],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _llamarTelefono,
-                              icon: const Icon(Icons.call),
-                              label: const Text('Llamar'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue[600],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(height: 4),
                     ],
                   ),
                 ),
@@ -1122,13 +1079,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
         ],
       ),
     );
-  }
-
-  String _getMensajePruebaGratuita() {
-    final now = DateTime.now();
-    final fin = DateTime(now.year, now.month + 1, now.day);
-    final formato = DateFormat('dd/MM/yyyy');
-    return 'Tu prueba gratuita termina el ${formato.format(fin)}.';
   }
 
   Color _hexToColor(String hexString) {

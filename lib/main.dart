@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'screens/punto_venta_screen.dart';
 import 'screens/productos_screen.dart';
 import 'screens/proveedores_screen.dart';
@@ -8,6 +9,7 @@ import 'screens/historial_ventas_screen.dart';
 import 'screens/corte_dia_screen.dart';
 import 'screens/configuracion_screen.dart';
 import 'services/user_profile_service.dart';
+import 'services/access_guard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,9 +58,103 @@ class MainApp extends StatelessWidget {
             ),
           ),
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-          home: const HomeScreen(),
+          home: const AccessGate(),
         );
       },
+    );
+  }
+}
+
+class AccessGate extends StatefulWidget {
+  const AccessGate({super.key});
+
+  @override
+  State<AccessGate> createState() => _AccessGateState();
+}
+
+class _AccessGateState extends State<AccessGate> {
+  late final Future<AccessDecision> _statusFuture = _verificarAcceso();
+
+  Future<AccessDecision> _verificarAcceso() async {
+    final guard = AccessGuard();
+    return guard.checkAccess();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<AccessDecision>(
+      future: _statusFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: Text('Error al validar la prueba.')),
+          );
+        }
+
+        final decision = snapshot.data!;
+        if (!decision.isAllowed) {
+          return AccessBlockedScreen(decision: decision);
+        }
+
+        return const HomeScreen();
+      },
+    );
+  }
+}
+
+class AccessBlockedScreen extends StatelessWidget {
+  final AccessDecision decision;
+
+  const AccessBlockedScreen({super.key, required this.decision});
+
+  @override
+  Widget build(BuildContext context) {
+    final expiracion = decision.trialExpiry == null
+        ? null
+        : DateFormat('dd/MM/yyyy HH:mm').format(decision.trialExpiry!);
+    final isTampered = decision.reason == AccessBlockReason.trialTampered;
+    final title = isTampered ? 'Acceso bloqueado' : 'Suscripción requerida';
+    final descripcion = isTampered
+        ? 'Se detecto un cambio de fecha en el dispositivo.'
+        : (expiracion == null
+            ? 'La prueba ha finalizado.'
+            : 'La prueba vencio el $expiracion.');
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock, size: 64, color: Colors.red[400]),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                descripcion,
+                style: const TextStyle(fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Necesitas una suscripción activa para continuar.',
+                style: TextStyle(fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

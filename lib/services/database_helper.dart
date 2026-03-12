@@ -791,6 +791,7 @@ class DatabaseHelper {
   // VENTAS
   Future<int> insertVenta(Venta venta) async {
     final db = await database;
+    final productosARecalcular = <int>{};
     
     final ventaId = await db.insert('ventas', venta.toMap());
     
@@ -798,14 +799,30 @@ class DatabaseHelper {
       final detalleMap = detalle.toMap();
       detalleMap['venta_id'] = ventaId;
       await db.insert('detalles_venta', detalleMap);
-      
-      final producto = await getProducto(detalle.productoId);
-      if (producto != null && producto.stock != null) {
-        await updateProductoStock(
-          detalle.productoId,
-          producto.stock! - detalle.cantidad,
-        );
+
+      if (detalle.varianteId != null) {
+        final variante = await getVariante(detalle.varianteId!);
+        if (variante != null && variante.stockEspecifico != null) {
+          final nuevoStock = variante.stockEspecifico! - detalle.cantidad;
+          await updateVarianteStock(
+            detalle.varianteId!,
+            nuevoStock < 0 ? 0 : nuevoStock,
+          );
+          productosARecalcular.add(variante.productoId);
+        }
+      } else {
+        final producto = await getProducto(detalle.productoId);
+        if (producto != null && producto.stock != null) {
+          await updateProductoStock(
+            detalle.productoId,
+            producto.stock! - detalle.cantidad,
+          );
+        }
       }
+    }
+
+    for (final productoId in productosARecalcular) {
+      await recalcularStockProductoDesdeVariantes(productoId);
     }
     
     await insertMovimientoCaja(MovimientoCaja(
@@ -880,15 +897,31 @@ class DatabaseHelper {
   Future<void> deleteVenta(int ventaId) async {
     final db = await database;
     final detalles = await getDetallesVenta(ventaId);
+    final productosARecalcular = <int>{};
 
     for (final detalle in detalles) {
-      final producto = await getProducto(detalle.productoId);
-      if (producto != null && producto.stock != null) {
-        await updateProductoStock(
-          detalle.productoId,
-          producto.stock! + detalle.cantidad,
-        );
+      if (detalle.varianteId != null) {
+        final variante = await getVariante(detalle.varianteId!);
+        if (variante != null && variante.stockEspecifico != null) {
+          await updateVarianteStock(
+            detalle.varianteId!,
+            variante.stockEspecifico! + detalle.cantidad,
+          );
+          productosARecalcular.add(variante.productoId);
+        }
+      } else {
+        final producto = await getProducto(detalle.productoId);
+        if (producto != null && producto.stock != null) {
+          await updateProductoStock(
+            detalle.productoId,
+            producto.stock! + detalle.cantidad,
+          );
+        }
       }
+    }
+
+    for (final productoId in productosARecalcular) {
+      await recalcularStockProductoDesdeVariantes(productoId);
     }
 
     await db.delete('detalles_venta', where: 'venta_id = ?', whereArgs: [ventaId]);
@@ -1028,7 +1061,9 @@ class DatabaseHelper {
   // VARIANTES DE PRODUCTOS
   Future<int> insertProductoVariante(ProductoVariante variante) async {
     final db = await database;
-    return await db.insert('producto_variantes', variante.toMap());
+    final id = await db.insert('producto_variantes', variante.toMap());
+    await recalcularStockProductoDesdeVariantes(variante.productoId);
+    return id;
   }
 
   Future<List<ProductoVariante>> getVariantesPorProducto(int productoId) async {
@@ -1058,21 +1093,68 @@ class DatabaseHelper {
 
   Future<int> updateProductoVariante(ProductoVariante variante) async {
     final db = await database;
-    return await db.update(
+    final rows = await db.update(
       'producto_variantes',
       variante.toMap(),
       where: 'id = ?',
       whereArgs: [variante.id],
     );
+    await recalcularStockProductoDesdeVariantes(variante.productoId);
+    return rows;
   }
 
   Future<int> deleteProductoVariante(int id) async {
     final db = await database;
-    return await db.delete(
+    final result = await db.query(
+      'producto_variantes',
+      columns: ['producto_id'],
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    final rows = await db.delete(
       'producto_variantes',
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    if (result.isNotEmpty) {
+      final productoId = (result.first['producto_id'] as num).toInt();
+      await recalcularStockProductoDesdeVariantes(productoId);
+    }
+
+    return rows;
+  }
+
+  Future<void> updateVarianteStock(int varianteId, int nuevoStock) async {
+    final db = await database;
+    await db.update(
+      'producto_variantes',
+      {'stock_especifico': nuevoStock},
+      where: 'id = ?',
+      whereArgs: [varianteId],
+    );
+  }
+
+  Future<void> recalcularStockProductoDesdeVariantes(int productoId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT COUNT(*) as total_variantes,
+               SUM(COALESCE(stock_especifico, 0)) as total_stock
+        FROM producto_variantes
+        WHERE producto_id = ?
+      ''',
+      [productoId],
+    );
+
+    if (result.isEmpty) return;
+    final totalVariantes = (result.first['total_variantes'] as num).toInt();
+    if (totalVariantes == 0) return;
+
+    final totalStock = (result.first['total_stock'] as num?)?.toInt() ?? 0;
+    await updateProductoStock(productoId, totalStock);
   }
 
   // DEVOLUCIONES

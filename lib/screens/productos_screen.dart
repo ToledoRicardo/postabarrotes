@@ -884,6 +884,7 @@ class _FormProductoScreenState extends State<FormProductoScreen> {
           await _dbHelper.updateProductoVariante(variante);
         }
       }
+      await _dbHelper.recalcularStockProductoDesdeVariantes(productoId);
     }
 
     if (mounted) {

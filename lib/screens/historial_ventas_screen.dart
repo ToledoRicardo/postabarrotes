@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:screenshot/screenshot.dart';
 import '../models/venta.dart';
 import '../services/database_helper.dart';
+import '../services/image_saver_service.dart';
 
 class HistorialVentasScreen extends StatefulWidget {
   const HistorialVentasScreen({super.key});
@@ -12,8 +17,10 @@ class HistorialVentasScreen extends StatefulWidget {
 
 class _HistorialVentasScreenState extends State<HistorialVentasScreen> {
   final _dbHelper = DatabaseHelper.instance;
+  final ScreenshotController _screenshotController = ScreenshotController();
   List<Venta> _ventas = [];
   bool _isLoading = true;
+  bool _isExportando = false;
   int _paginaActual = 0;
   static const int _tamanoPagina = 5;
 
@@ -122,6 +129,224 @@ class _HistorialVentasScreenState extends State<HistorialVentasScreen> {
         _paginaActual = 0;
       });
     }
+  }
+
+  Future<bool> _solicitarPermisoGuardar() async {
+    if (Platform.isIOS) {
+      final status = await Permission.photosAddOnly.request();
+      return status.isGranted;
+    }
+    if (Platform.isAndroid) {
+      final photos = await Permission.photos.request();
+      if (photos.isGranted) return true;
+      final storage = await Permission.storage.request();
+      return storage.isGranted;
+    }
+    return true;
+  }
+
+  Future<void> _exportarDesgloseDiario() async {
+    final fecha = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+
+    if (fecha == null) return;
+
+    setState(() => _isExportando = true);
+
+    try {
+      final permitido = await _solicitarPermisoGuardar();
+      if (!permitido) {
+        throw Exception('Permiso denegado para guardar imagen');
+      }
+
+      final ventas = await _dbHelper.getVentasPorFecha(fecha);
+      if (ventas.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No hay ventas para ese dia'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final formatoCurrency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+      final paginas = _buildPaginasDesglose(ventas, formatoCurrency);
+
+      var guardadas = 0;
+      for (var i = 0; i < paginas.length; i++) {
+        final image = await _screenshotController.captureFromWidget(
+          _buildPaginaDesglose(
+            fecha: fecha,
+            totalDia: ventas.fold(0.0, (sum, v) => sum + v.total),
+            contenido: paginas[i],
+            paginaActual: i + 1,
+            totalPaginas: paginas.length,
+            formatoCurrency: formatoCurrency,
+          ),
+          pixelRatio: 2.0,
+        );
+
+        final nombre = 'ventas_${DateFormat('yyyyMMdd').format(fecha)}_${i + 1}';
+        final result = await ImageSaverService.saveImage(
+          image,
+          quality: 100,
+          name: nombre,
+        );
+        final success = result['isSuccess'] == true || result['isSuccess'] == 1;
+        if (success) guardadas++;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Desglose guardado: $guardadas imagen(es)'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExportando = false);
+    }
+  }
+
+  List<List<Widget>> _buildPaginasDesglose(List<Venta> ventas, NumberFormat fmt) {
+    const maxLineas = 22;
+    final paginas = <List<Widget>>[];
+    var current = <Widget>[];
+    var lineas = 0;
+
+    void push(Widget widget, int count) {
+      if (lineas + count > maxLineas && current.isNotEmpty) {
+        paginas.add(current);
+        current = <Widget>[];
+        lineas = 0;
+      }
+      current.add(widget);
+      lineas += count;
+    }
+
+    final formatoHora = DateFormat('HH:mm');
+
+    for (final venta in ventas) {
+      push(_buildVentaHeader(venta, fmt, formatoHora), 1);
+      for (final detalle in venta.detalles) {
+        push(_buildDetalleLinea(detalle, fmt), 1);
+      }
+      push(_buildVentaTotales(venta, fmt), 1);
+      push(const Divider(height: 16), 1);
+    }
+
+    if (current.isNotEmpty) {
+      paginas.add(current);
+    }
+
+    return paginas;
+  }
+
+  Widget _buildPaginaDesglose({
+    required DateTime fecha,
+    required double totalDia,
+    required List<Widget> contenido,
+    required int paginaActual,
+    required int totalPaginas,
+    required NumberFormat formatoCurrency,
+  }) {
+    return MediaQuery(
+      data: const MediaQueryData(),
+      child: Material(
+        color: Colors.white,
+        child: Container(
+          width: 420,
+          padding: const EdgeInsets.all(20),
+          color: Colors.white,
+          child: DefaultTextStyle(
+            style: const TextStyle(color: Colors.black87, fontSize: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Desglose de ventas diario',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  DateFormat('dd/MM/yyyy').format(fecha),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total del dia: ${formatoCurrency.format(totalDia)}'),
+                    Text('Pagina $paginaActual/$totalPaginas'),
+                  ],
+                ),
+                const Divider(height: 24),
+                ...contenido,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVentaHeader(Venta venta, NumberFormat fmt, DateFormat formatoHora) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('Venta #${venta.id} • ${formatoHora.format(venta.fechaVenta)}'),
+        Text(fmt.format(venta.total), style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildDetalleLinea(DetalleVenta detalle, NumberFormat fmt) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 10, top: 2, bottom: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              '${detalle.cantidad}x ${detalle.productoNombre}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(fmt.format(detalle.subtotal)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVentaTotales(Venta venta, NumberFormat fmt) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Pagado: ${fmt.format(venta.montoPagado)}  Cambio: ${fmt.format(venta.cambio)}'),
+        ],
+      ),
+    );
   }
 
   @override
@@ -240,6 +465,30 @@ class _HistorialVentasScreenState extends State<HistorialVentasScreen> {
                               tooltip: 'Limpiar fechas',
                             ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isExportando ? null : _exportarDesgloseDiario,
+                          icon: _isExportando
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.receipt_long),
+                          label: Text(
+                            _isExportando
+                                ? 'Generando desglose...'
+                                : 'Desglose de venta diario',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       // Ordenar

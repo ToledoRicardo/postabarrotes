@@ -239,14 +239,25 @@ class _PuntoVentaScreenState extends State<PuntoVentaScreen> {
             itemBuilder: (context, index) {
               final variante = variantes[index];
               final precioTotal = variante.getPrecioTotal(producto.precio);
+              final sinStock = variante.stockEspecifico != null && variante.stockEspecifico! <= 0;
+              final stockText = variante.stockEspecifico != null
+                  ? 'Stock: ${variante.stockEspecifico}'
+                  : 'Stock: -';
               return ListTile(
                 title: Text(variante.nombre),
-                subtitle: Text('${variante.contenido}${variante.unidadMedida}'),
+                subtitle: Text(
+                  '${variante.contenido}${variante.unidadMedida}\n$stockText',
+                  style: TextStyle(color: sinStock ? Colors.red[400] : null),
+                ),
                 trailing: Text(
                   NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(precioTotal),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 onTap: () {
+                  if (sinStock) {
+                    _mostrarSnackBar('Variante sin stock disponible', Colors.red[400]!);
+                    return;
+                  }
                   setState(() {
                     _carrito.add(DetalleVenta(
                       productoId: producto.id!,
